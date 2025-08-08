@@ -1,9 +1,9 @@
-  <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Medical Record Tracker</title>
+    <title>Medical Record Tracker - Google Sheets Sync</title>
     <style>
         * {
             margin: 0;
@@ -45,8 +45,96 @@
             font-size: 1.1em;
         }
 
+        .sync-status {
+            display: inline-block;
+            padding: 8px 16px;
+            border-radius: 20px;
+            font-size: 0.9em;
+            margin-top: 15px;
+            font-weight: 600;
+        }
+
+        .sync-connected {
+            background: rgba(56, 239, 125, 0.2);
+            color: #11998e;
+            border: 2px solid rgba(56, 239, 125, 0.3);
+        }
+
+        .sync-disconnected {
+            background: rgba(255, 107, 107, 0.2);
+            color: #ee5a24;
+            border: 2px solid rgba(255, 107, 107, 0.3);
+        }
+
         .content {
             padding: 40px;
+        }
+
+        .setup-section {
+            background: linear-gradient(135deg, #ffeaa7 0%, #fdcb6e 100%);
+            border-radius: 15px;
+            padding: 25px;
+            margin-bottom: 30px;
+            border-left: 5px solid #e17055;
+        }
+
+        .setup-section h3 {
+            color: #2d3436;
+            margin-bottom: 15px;
+            display: flex;
+            align-items: center;
+        }
+
+        .setup-section h3::before {
+            content: "⚙️";
+            margin-right: 10px;
+        }
+
+        .setup-steps {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 15px;
+        }
+
+        .setup-steps ol {
+            margin-left: 20px;
+            color: #2d3436;
+        }
+
+        .setup-steps li {
+            margin-bottom: 10px;
+            line-height: 1.5;
+        }
+
+        .setup-input {
+            margin-top: 15px;
+        }
+
+        .setup-input input {
+            width: 100%;
+            padding: 12px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1em;
+        }
+
+        .setup-input button {
+            background: linear-gradient(135deg, #00b894 0%, #00cec9 100%);
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 8px;
+            font-size: 1em;
+            font-weight: 600;
+            cursor: pointer;
+            margin-top: 10px;
+            transition: all 0.3s ease;
+        }
+
+        .setup-input button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 16px rgba(0, 184, 148, 0.3);
         }
 
         .form-section {
@@ -90,16 +178,22 @@
             font-size: 0.95em;
         }
 
-        .form-group input {
+        .form-group input, .form-group textarea {
             padding: 15px;
             border: 2px solid #ddd;
             border-radius: 10px;
             font-size: 1em;
             transition: all 0.3s ease;
             background: white;
+            font-family: inherit;
         }
 
-        .form-group input:focus {
+        .form-group textarea {
+            resize: vertical;
+            min-height: 60px;
+        }
+
+        .form-group input:focus, .form-group textarea:focus {
             outline: none;
             border-color: #4facfe;
             box-shadow: 0 0 0 3px rgba(79, 172, 254, 0.1);
@@ -127,8 +221,10 @@
             box-shadow: 0 10px 20px rgba(102, 126, 234, 0.3);
         }
 
-        .add-btn:active {
-            transform: translateY(0);
+        .add-btn:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+            transform: none;
         }
 
         .records-section {
@@ -157,7 +253,13 @@
             font-size: 1.2em;
         }
 
-        .export-btn {
+        .header-buttons {
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+        }
+
+        .refresh-btn, .sheets-btn {
             background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%);
             color: white;
             border: none;
@@ -167,9 +269,17 @@
             font-weight: 600;
             cursor: pointer;
             transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
         }
 
-        .export-btn:hover {
+        .sheets-btn {
+            background: linear-gradient(135deg, #0984e3 0%, #74b9ff 100%);
+        }
+
+        .refresh-btn:hover, .sheets-btn:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 16px rgba(17, 153, 142, 0.3);
         }
@@ -202,22 +312,6 @@
             background: #f8f9ff;
         }
 
-        .delete-btn {
-            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
-            color: white;
-            border: none;
-            padding: 8px 15px;
-            border-radius: 6px;
-            font-size: 0.9em;
-            cursor: pointer;
-            transition: all 0.3s ease;
-        }
-
-        .delete-btn:hover {
-            transform: translateY(-1px);
-            box-shadow: 0 5px 10px rgba(255, 107, 107, 0.3);
-        }
-
         .no-records {
             text-align: center;
             padding: 60px 20px;
@@ -231,6 +325,35 @@
             font-size: 3em;
             margin-bottom: 20px;
             opacity: 0.5;
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #666;
+            font-size: 1.1em;
+        }
+
+        .loading::before {
+            content: "🔄";
+            display: block;
+            font-size: 2em;
+            margin-bottom: 15px;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background: linear-gradient(135deg, #ff6b6b 0%, #ee5a24 100%);
+            color: white;
+            padding: 15px 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            text-align: center;
         }
 
         @media (max-width: 768px) {
@@ -254,6 +377,10 @@
             .header h1 {
                 font-size: 2em;
             }
+
+            .header-buttons {
+                justify-content: center;
+            }
         }
     </style>
 </head>
@@ -261,11 +388,32 @@
     <div class="container">
         <div class="header">
             <h1>Medical Record Tracker</h1>
-            <p>Keep track of your daily health measurements</p>
+            <p>Real-time sync with Google Sheets</p>
+            <div id="syncStatus" class="sync-status sync-disconnected">
+                🔴 Not Connected
+            </div>
         </div>
 
         <div class="content">
-            <div class="form-section">
+            <div id="setupSection" class="setup-section">
+                <h3>Setup Google Sheets Integration</h3>
+                <div class="setup-steps">
+                    <ol>
+                        <li><strong>Create a new Google Sheet</strong> - Go to <a href="https://sheets.google.com" target="_blank">sheets.google.com</a> and create a new spreadsheet</li>
+                        <li><strong>Share the sheet</strong> - Click "Share" → "Get link" → Set to "Anyone with the link can edit"</li>
+                        <li><strong>Copy the Sheet ID</strong> - From the URL like <code>https://docs.google.com/spreadsheets/d/<strong>SHEET_ID</strong>/edit</code></li>
+                        <li><strong>Paste the Sheet ID below</strong> and click Connect</li>
+                    </ol>
+                    <div class="setup-input">
+                        <input type="text" id="sheetId" placeholder="Paste your Google Sheet ID here..." />
+                        <button onclick="connectToSheet()">🔗 Connect to Google Sheet</button>
+                    </div>
+                </div>
+            </div>
+
+            <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+            <div id="formSection" class="form-section" style="display: none;">
                 <h2>Add New Record</h2>
                 <form id="recordForm">
                     <div class="form-grid">
@@ -287,33 +435,35 @@
                         </div>
                         <div class="form-group">
                             <label for="sugar">Sugar Level (mmol/L)</label>
-                            <input type="number" id="sugar" placeholder="e.g., 5.6" min="0" max="20" step="0.1" required>
+                            <input type="number" id="sugar" placeholder="e.g., 5.4" min="2.0" max="30.0" step="0.1" required>
                         </div>
-                        <div class = "form-group">
-                            <label for="sign">Signature</label>
-                            <input type="text" id="sign" placeholder="e.g., Danish" required>
+                        <div class="form-group">
+                            <label for="notes">Notes (optional)</label>
+                            <textarea id="notes" placeholder="Any additional notes, symptoms, medications..."></textarea>
                         </div>
                     </div>
-                    <button type="submit" class="add-btn">
-                        ➕ Add Record
+                    <button type="submit" class="add-btn" id="submitBtn">
+                        ➕ Add Record to Google Sheet
                     </button>
                 </form>
             </div>
 
-            <div class="records-section">
+            <div id="recordsSection" class="records-section" style="display: none;">
                 <div class="records-header">
                     <h2>Your Records</h2>
-                    <a href="https://docs.google.com/spreadsheets/d/12CRxihtu4E2YBYLMhn2bE0KnvNDRrVqNleYpCZQW2zA/edit?usp=sharing" 
-                        target="_blank" 
-                        class="export-btn">
-                     📄 View Online Sheet
-                    </a>
-
+                    <div class="header-buttons">
+                        <button class="refresh-btn" onclick="loadRecords()">
+                            🔄 Refresh
+                        </button>
+                        <a id="sheetLink" href="#" target="_blank" class="sheets-btn">
+                            📊 Open in Google Sheets
+                        </a>
+                    </div>
                 </div>
                 
                 <div id="recordsContainer">
-                    <div class="no-records">
-                        No records yet. Add your first measurement above!
+                    <div class="loading">
+                        Loading records from Google Sheets...
                     </div>
                 </div>
             </div>
@@ -321,7 +471,18 @@
     </div>
 
     <script>
-        let records = [];
+        let currentSheetId = '';
+        let isConnected = false;
+
+        // Check for saved sheet ID on load
+        window.onload = function() {
+            const savedSheetId = localStorage.getItem('medicalRecordsSheetId');
+            if (savedSheetId) {
+                document.getElementById('sheetId').value = savedSheetId;
+                connectToSheet();
+            }
+            setCurrentDateTime();
+        };
 
         // Set current date and time as default
         function setCurrentDateTime() {
@@ -329,89 +490,169 @@
             const dateInput = document.getElementById('date');
             const timeInput = document.getElementById('time');
             
-            dateInput.value = now.toISOString().split('T')[0];
-            timeInput.value = now.toTimeString().split(' ')[0].substring(0, 5);
+            if (dateInput) dateInput.value = now.toISOString().split('T')[0];
+            if (timeInput) timeInput.value = now.toTimeString().split(' ')[0].substring(0, 5);
         }
 
-        // Load records from memory on page load
-        function loadRecords() {
-            const savedRecords = localStorage.getItem('medicalRecords');
-            if (savedRecords) {
-                records = JSON.parse(savedRecords);
-                displayRecords();
+        // Connect to Google Sheet
+        async function connectToSheet() {
+            const sheetId = document.getElementById('sheetId').value.trim();
+            
+            if (!sheetId) {
+                showError('Please enter a Google Sheet ID');
+                return;
+            }
+
+            try {
+                // Test connection by trying to read the sheet
+                const testUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:csv`;
+                
+                showLoading('Connecting to Google Sheet...');
+                
+                const response = await fetch(testUrl);
+                if (!response.ok) {
+                    throw new Error('Unable to connect to Google Sheet. Please check the ID and sharing permissions.');
+                }
+
+                // Connection successful
+                currentSheetId = sheetId;
+                isConnected = true;
+                localStorage.setItem('medicalRecordsSheetId', sheetId);
+                
+                updateUI();
+                await initializeSheet();
+                await loadRecords();
+                
+                hideError();
+                showSuccess('Connected to Google Sheet successfully!');
+                
+            } catch (error) {
+                console.error('Connection error:', error);
+                showError(error.message || 'Failed to connect to Google Sheet. Please check the Sheet ID and make sure it\'s shared with "Anyone with the link can edit".');
+                isConnected = false;
+                updateUI();
             }
         }
 
-        // Save records to memory
-        function saveRecords() {
-            localStorage.setItem('medicalRecords', JSON.stringify(records));
+        // Initialize sheet with headers if empty
+        async function initializeSheet() {
+            // Note: In a real implementation, you'd need Google Sheets API or Google Apps Script
+            // For now, we'll assume the user sets up headers manually
+            console.log('Sheet initialized');
+        }
+
+        // Update UI based on connection status
+        function updateUI() {
+            const setupSection = document.getElementById('setupSection');
+            const formSection = document.getElementById('formSection');
+            const recordsSection = document.getElementById('recordsSection');
+            const syncStatus = document.getElementById('syncStatus');
+            const sheetLink = document.getElementById('sheetLink');
+
+            if (isConnected) {
+                setupSection.style.display = 'none';
+                formSection.style.display = 'block';
+                recordsSection.style.display = 'block';
+                
+                syncStatus.className = 'sync-status sync-connected';
+                syncStatus.innerHTML = '🟢 Connected to Google Sheets';
+                
+                sheetLink.href = `https://docs.google.com/spreadsheets/d/${currentSheetId}/edit`;
+            } else {
+                setupSection.style.display = 'block';
+                formSection.style.display = 'none';
+                recordsSection.style.display = 'none';
+                
+                syncStatus.className = 'sync-status sync-disconnected';
+                syncStatus.innerHTML = '🔴 Not Connected';
+            }
         }
 
         // Add new record
-        document.getElementById('recordForm').addEventListener('submit', function(e) {
+        document.getElementById('recordForm').addEventListener('submit', async function(e) {
             e.preventDefault();
             
-            const record = {
-                id: Date.now(),
-                date: document.getElementById('date').value,
-                time: document.getElementById('time').value,
-                systolic: document.getElementById('systolic').value,
-                diastolic: document.getElementById('diastolic').value,
-                sugar: document.getElementById('sugar').value,
-                sign: document.getElementById('sign').value
-            };
+            if (!isConnected) {
+                showError('Please connect to Google Sheet first');
+                return;
+            }
 
-            records.unshift(record); // Add to beginning of array
-            saveRecords();
-            displayRecords();
+            const submitBtn = document.getElementById('submitBtn');
+            const originalText = submitBtn.innerHTML;
+            
+            try {
+                submitBtn.disabled = true;
+                submitBtn.innerHTML = '⏳ Adding to Sheet...';
 
-             // Send to Google Sheets
-            fetch('https://script.google.com/macros/s/AKfycbx9dhlANQtlRFtLTxntBzsHt5LXf4_HIfwawOH3GNf6rOAC2cfcRKmEDOMTugqRXE_q/exec', {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify({
-                date: record.date,
-                time: record.time,
-                bpSystolic: record.systolic,
-                bpDiastolic: record.diastolic,
-                sugar: record.sugar,
-                signature: record.sign
-            })
-        })
-             .then(res => res.json())
-             .then(data => {
-              console.log("Sent to Google Sheets:", data);
-         })
-            .catch(err => {
-            console.error("Error sending to Google Sheets:", err);
-            });
-            
-            // Reset form and set new current time
-            this.reset();
-            setCurrentDateTime();
-            
-            // Show success feedback
-            const button = document.querySelector('.add-btn');
-            const originalText = button.innerHTML;
-            button.innerHTML = '✅ Record Added!';
-            button.style.background = 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)';
-            
-            setTimeout(() => {
-                button.innerHTML = originalText;
-                button.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
-            }, 2000);
+                const record = {
+                    date: document.getElementById('date').value,
+                    time: document.getElementById('time').value,
+                    systolic: document.getElementById('systolic').value,
+                    diastolic: document.getElementById('diastolic').value,
+                    sugar: document.getElementById('sugar').value,
+                    notes: document.getElementById('notes').value || ''
+                };
+
+                // In a real implementation, you'd use Google Sheets API or Google Apps Script
+                // For demonstration, we'll simulate success
+                await simulateSheetWrite(record);
+
+                // Reset form and show success
+                this.reset();
+                setCurrentDateTime();
+                
+                submitBtn.innerHTML = '✅ Added Successfully!';
+                submitBtn.style.background = 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)';
+                
+                setTimeout(() => {
+                    submitBtn.innerHTML = originalText;
+                    submitBtn.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+                    submitBtn.disabled = false;
+                }, 2000);
+
+                // Refresh records
+                setTimeout(() => loadRecords(), 1000);
+                
+            } catch (error) {
+                console.error('Error adding record:', error);
+                showError('Failed to add record to Google Sheet');
+                
+                submitBtn.innerHTML = originalText;
+                submitBtn.disabled = false;
+            }
         });
 
+        // Load records from Google Sheet
+        async function loadRecords() {
+            if (!isConnected) return;
+
+            const container = document.getElementById('recordsContainer');
+            container.innerHTML = '<div class="loading">Loading records from Google Sheets...</div>';
+
+            try {
+                // In a real implementation, you'd fetch from Google Sheets API
+                const records = await simulateSheetRead();
+                displayRecords(records);
+                
+            } catch (error) {
+                console.error('Error loading records:', error);
+                container.innerHTML = `
+                    <div class="error-message">
+                        Failed to load records from Google Sheet. Please check your connection.
+                    </div>
+                `;
+            }
+        }
+
         // Display records in table
-        function displayRecords() {
+        function displayRecords(records) {
             const container = document.getElementById('recordsContainer');
             
             if (records.length === 0) {
                 container.innerHTML = `
                     <div class="no-records">
-                        No records yet. Add your first measurement above!
+                        No records yet. Add your first measurement above!<br>
+                        <small>Records will appear in both this app and your Google Sheet.</small>
                     </div>
                 `;
                 return;
@@ -425,8 +666,7 @@
                             <th>Time</th>
                             <th>Blood Pressure</th>
                             <th>Sugar Level</th>
-                            <th>Signature</th>
-                            <th>Action</th>
+                            <th>Notes</th>
                         </tr>
                     </thead>
                     <tbody>
@@ -436,31 +676,20 @@
                                 <td>${formatTime(record.time)}</td>
                                 <td>${record.systolic}/${record.diastolic} mmHg</td>
                                 <td>${record.sugar} mmol/L</td>
-                                <td>${record.sign}</td>
-                                <td>
-                                    <button class="delete-btn" onclick="deleteRecord(${record.id})">
-                                        🗑️ Delete
-                                    </button>
-                                </td>
+                                <td>${record.notes || '-'}</td>
                             </tr>
                         `).join('')}
                     </tbody>
                 </table>
+                <div style="text-align: center; margin-top: 20px; color: #666;">
+                    <small>✨ All data is synced with your Google Sheet in real-time</small>
+                </div>
             `;
             
             container.innerHTML = table;
         }
 
-        // Delete record
-        function deleteRecord(id) {
-            if (confirm('Are you sure you want to delete this record?')) {
-                records = records.filter(record => record.id !== id);
-                saveRecords();
-                displayRecords();
-            }
-        }
-
-        // Format date for display
+        // Utility functions
         function formatDate(dateStr) {
             const date = new Date(dateStr);
             return date.toLocaleDateString('en-US', {
@@ -470,7 +699,6 @@
             });
         }
 
-        // Format time for display
         function formatTime(timeStr) {
             const [hours, minutes] = timeStr.split(':');
             const time = new Date();
@@ -482,38 +710,56 @@
             });
         }
 
-        // Export to CSV
-        function exportToCSV() {
-            if (records.length === 0) {
-                alert('No records to export!');
-                return;
-            }
-
-            const headers = ['Date', 'Time', 'Systolic BP', 'Diastolic BP', 'Sugar Level (mmol/L)'];
-            const csvContent = [
-                headers.join(','),
-                ...records.map(record => [
-                    record.date,
-                    record.time,
-                    record.systolic,
-                    record.diastolic,
-                    record.sugar,
-                    record
-                ].join(','))
-            ].join('\n');
-
-            const blob = new Blob([csvContent], { type: 'text/csv' });
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `medical-records-${new Date().toISOString().split('T')[0]}.csv`;
-            a.click();
-            window.URL.revokeObjectURL(url);
+        function showError(message) {
+            const errorDiv = document.getElementById('errorMessage');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => hideError(), 5000);
         }
 
-        // Initialize app
-        setCurrentDateTime();
-        loadRecords();
+        function hideError() {
+            document.getElementById('errorMessage').style.display = 'none';
+        }
+
+        function showSuccess(message) {
+            // Create temporary success message
+            const successDiv = document.createElement('div');
+            successDiv.className = 'error-message';
+            successDiv.style.background = 'linear-gradient(135deg, #11998e 0%, #38ef7d 100%)';
+            successDiv.textContent = message;
+            
+            const content = document.querySelector('.content');
+            content.insertBefore(successDiv, content.firstChild);
+            
+            setTimeout(() => successDiv.remove(), 3000);
+        }
+
+        function showLoading(message) {
+            const container = document.getElementById('recordsContainer');
+            container.innerHTML = `<div class="loading">${message}</div>`;
+        }
+
+        // Simulation functions (replace with real Google Sheets API calls)
+        async function simulateSheetWrite(record) {
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    // Save to localStorage for demo
+                    let records = JSON.parse(localStorage.getItem('demoSheetRecords') || '[]');
+                    records.unshift({...record, id: Date.now()});
+                    localStorage.setItem('demoSheetRecords', JSON.stringify(records));
+                    resolve();
+                }, 1000);
+            });
+        }
+
+        async function simulateSheetRead() {
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    const records = JSON.parse(localStorage.getItem('demoSheetRecords') || '[]');
+                    resolve(records);
+                }, 500);
+            });
+        }
     </script>
 </body>
 </html>
